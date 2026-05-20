@@ -17,11 +17,8 @@ const boardState = [
   ['wR','wN','wB','wQ','wK','wB','wN','wR'],
 ];
 
-// currently selected square {row, col} or null
 let selectedSquare = null;
-
-// ── STEP 4 NEW ──
-// whose turn is it? 'w' = white, 'b' = black
+let validMoves = [];        // stores valid move squares for selected piece
 let currentTurn = 'w';
 
 // ── RANK LABELS ──
@@ -40,28 +37,136 @@ FILES.forEach(f => {
   fileLabels.appendChild(span);
 });
 
-// ── STEP 4 NEW ──
-// Returns 'w' or 'b' from a piece string like 'wP' or 'bK'
+// ── HELPER: get color of a piece ──
 function getColor(piece) {
-  return piece ? piece[0] : null;  // first character is the color
+  return piece ? piece[0] : null;
 }
 
-// ── STEP 4 NEW ──
-// MOVE function — moves piece from one square to another in boardState
+// ── HELPER: is a position inside the board? ──
+function inBounds(row, col) {
+  return row >= 0 && row < 8 && col >= 0 && col < 8;
+}
+
+// ──────────────────────────────────────────
+//  GET VALID MOVES — main function
+//  Returns array of {row, col} the piece can move to
+// ──────────────────────────────────────────
+function getValidMoves(row, col) {
+  const piece = boardState[row][col];
+  if (!piece) return [];
+
+  const color = getColor(piece);
+  const type  = piece[1];   // P, R, N, B, Q, K
+  const moves = [];
+
+  // ── PAWN ──
+  if (type === 'P') {
+    // white pawns move UP (row decreases), black pawns move DOWN (row increases)
+    const dir = color === 'w' ? -1 : 1;
+    const startRow = color === 'w' ? 6 : 1;
+
+    // 1 step forward — only if square is empty
+    if (inBounds(row + dir, col) && !boardState[row + dir][col]) {
+      moves.push({ row: row + dir, col });
+
+      // 2 steps forward from starting row — only if BOTH squares are empty
+      if (row === startRow && !boardState[row + dir * 2][col]) {
+        moves.push({ row: row + dir * 2, col });
+      }
+    }
+
+    // diagonal capture — only if enemy piece is there
+    [-1, 1].forEach(side => {
+      if (inBounds(row + dir, col + side)) {
+        const target = boardState[row + dir][col + side];
+        if (target && getColor(target) !== color) {
+          moves.push({ row: row + dir, col: col + side });
+        }
+      }
+    });
+  }
+
+  // ── ROOK — moves in 4 straight directions ──
+  if (type === 'R' || type === 'Q') {
+    const directions = [[-1,0],[1,0],[0,-1],[0,1]];
+    directions.forEach(([dr, dc]) => {
+      let r = row + dr;
+      let c = col + dc;
+      while (inBounds(r, c)) {
+        if (!boardState[r][c]) {
+          moves.push({ row: r, col: c });   // empty square → can move
+        } else {
+          if (getColor(boardState[r][c]) !== color) {
+            moves.push({ row: r, col: c }); // enemy → can capture, then stop
+          }
+          break; // friendly or enemy → stop sliding
+        }
+        r += dr;
+        c += dc;
+      }
+    });
+  }
+
+  // ── BISHOP — moves in 4 diagonal directions ──
+  if (type === 'B' || type === 'Q') {
+    const directions = [[-1,-1],[-1,1],[1,-1],[1,1]];
+    directions.forEach(([dr, dc]) => {
+      let r = row + dr;
+      let c = col + dc;
+      while (inBounds(r, c)) {
+        if (!boardState[r][c]) {
+          moves.push({ row: r, col: c });
+        } else {
+          if (getColor(boardState[r][c]) !== color) {
+            moves.push({ row: r, col: c });
+          }
+          break;
+        }
+        r += dr;
+        c += dc;
+      }
+    });
+  }
+
+  // ── KNIGHT — L shaped jumps ──
+  if (type === 'N') {
+    const jumps = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+    jumps.forEach(([dr, dc]) => {
+      const r = row + dr;
+      const c = col + dc;
+      if (inBounds(r, c)) {
+        // can move if square is empty or has enemy
+        if (!boardState[r][c] || getColor(boardState[r][c]) !== color) {
+          moves.push({ row: r, col: c });
+        }
+      }
+    });
+  }
+
+  // ── KING — 1 square in any direction ──
+  if (type === 'K') {
+    const steps = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+    steps.forEach(([dr, dc]) => {
+      const r = row + dr;
+      const c = col + dc;
+      if (inBounds(r, c)) {
+        if (!boardState[r][c] || getColor(boardState[r][c]) !== color) {
+          moves.push({ row: r, col: c });
+        }
+      }
+    });
+  }
+
+  return moves;
+}
+
+// ── MOVE PIECE ──
 function movePiece(fromRow, fromCol, toRow, toCol) {
-  // put the piece on the new square
   boardState[toRow][toCol] = boardState[fromRow][fromCol];
-
-  // empty the old square
   boardState[fromRow][fromCol] = null;
-
-  // switch turn after every move
   currentTurn = currentTurn === 'w' ? 'b' : 'w';
-
-  // clear selection
   selectedSquare = null;
-
-  // redraw
+  validMoves = [];
   renderBoard();
 }
 
@@ -80,9 +185,15 @@ function renderBoard() {
       square.dataset.col = col;
       square.dataset.square = FILES[col] + RANKS[row];
 
-      // highlight selected square
+      // green = selected piece
       if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
         square.classList.add('selected');
+      }
+
+      // yellow = valid move square
+      const isValid = validMoves.some(m => m.row === row && m.col === col);
+      if (isValid) {
+        square.classList.add('valid-move');
       }
 
       const piece = boardState[row][col];
@@ -97,9 +208,7 @@ function renderBoard() {
     }
   }
 
-  // update whose turn it is on screen
   updateTurnDisplay();
-
   addClickListeners();
 }
 
@@ -112,35 +221,43 @@ function addClickListeners() {
 
       const row = parseInt(square.dataset.row);
       const col = parseInt(square.dataset.col);
-      const piece = boardState[row][col];           // piece on clicked square
-      const clickedColor = getColor(piece);         // color of that piece
+      const piece = boardState[row][col];
+      const clickedColor = getColor(piece);
 
-      // ── Case 1: nothing selected yet ──
+      // Case 1: nothing selected
       if (!selectedSquare) {
-        // only select if the piece belongs to the current player
         if (piece && clickedColor === currentTurn) {
           selectedSquare = { row, col };
+          validMoves = getValidMoves(row, col);  // calculate valid moves
           renderBoard();
         }
 
-      // ── Case 2: clicked the same square → deselect ──
+      // Case 2: clicked same square → deselect
       } else if (selectedSquare.row === row && selectedSquare.col === col) {
         selectedSquare = null;
+        validMoves = [];
         renderBoard();
 
-      // ── Case 3: a square is already selected ──
+      // Case 3: square already selected
       } else {
         const selectedPiece = boardState[selectedSquare.row][selectedSquare.col];
         const selectedColor = getColor(selectedPiece);
 
-        // clicked a friendly piece → switch selection to it
+        // clicked friendly piece → switch selection
         if (piece && clickedColor === selectedColor) {
           selectedSquare = { row, col };
+          validMoves = getValidMoves(row, col);
           renderBoard();
 
-        // clicked empty square or enemy piece → MOVE!
-        } else {
+        // clicked a valid move square → MOVE
+        } else if (validMoves.some(m => m.row === row && m.col === col)) {
           movePiece(selectedSquare.row, selectedSquare.col, row, col);
+
+        // clicked invalid square → deselect
+        } else {
+          selectedSquare = null;
+          validMoves = [];
+          renderBoard();
         }
       }
 
@@ -148,8 +265,7 @@ function addClickListeners() {
   });
 }
 
-// ── STEP 4 NEW ──
-// Shows whose turn it is below the board
+// ── TURN DISPLAY ──
 function updateTurnDisplay() {
   let display = document.getElementById('turn-display');
   if (!display) {

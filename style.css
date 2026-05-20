@@ -72,10 +72,29 @@ h1 {
 .square.light { background: #F0D9B5; }
 .square.dark  { background: #B58863; }
 
-/* ── STEP 3 NEW ── */
-/* Green highlight for selected piece */
+/* selected piece → green */
 .square.selected {
   background: #7fc97f !important;
+}
+
+/* valid move square → yellow dot in center */
+.square.valid-move::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 220, 50, 0.7);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* valid move square that has an enemy piece → yellow ring instead */
+.square.valid-move.has-piece::after {
+  width: 54px;
+  height: 54px;
+  background: transparent;
+  border: 4px solid rgba(255, 220, 50, 0.8);
+  border-radius: 50%;
 }
 
 .piece {
