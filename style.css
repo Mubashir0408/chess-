@@ -77,24 +77,21 @@ h1 {
   background: #7fc97f !important;
 }
 
-/* valid move square → yellow dot in center */
+/* valid move → yellow dot */
 .square.valid-move::after {
   content: '';
   position: absolute;
   width: 20px;
   height: 20px;
-  background: rgba(255, 220, 50, 0.7);
+  background: rgba(255, 220, 50, 0.75);
   border-radius: 50%;
   pointer-events: none;
 }
 
-/* valid move square that has an enemy piece → yellow ring instead */
-.square.valid-move.has-piece::after {
-  width: 54px;
-  height: 54px;
-  background: transparent;
-  border: 4px solid rgba(255, 220, 50, 0.8);
-  border-radius: 50%;
+/* STEP 6 NEW — king in check → red glow */
+.square.in-check {
+  background: #e74c3c !important;
+  box-shadow: inset 0 0 12px rgba(255, 0, 0, 0.6);
 }
 
 .piece {
